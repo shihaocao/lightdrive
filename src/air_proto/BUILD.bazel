@@ -1,9 +1,0 @@
-cc_library(
-    name = "air_proto",
-    deps = ["//include/protos:state_field_registry_cc_proto"],
-    srcs = ["air_proto.cpp"],
-    data = [],
-    hdrs = ["air_proto.hpp"],
-    visibility=["//visibility:public"]
-
-)
