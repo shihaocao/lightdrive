@@ -48,3 +48,26 @@ Notes:
 ### Octo WS2811
 Notes:
 - https://www.pjrc.com/teensy/td_libs_OctoWS2811.html
+
+## 2025.12.30
+
+I will need this tomorrow:
+
+```
+lsusb | grep -i novation
+aconnect -l
+aseqdump -p "Launchpad X MIDI 1"
+aconnect "Launchpad X MIDI 1" "Launchpad X MIDI 1"
+```
+
+Proof of concept:
+```
+python scripts/send_midi.py
+pio run -e lightdrive3 -t upload
+```
+This will do:
+```
+Python -> MIDI -> (USB Host/MIDI/ALSA?) -> MIDI over USB -> Teensy -> LightDrive Program
+```
+
+Nice.
