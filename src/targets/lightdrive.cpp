@@ -8,6 +8,7 @@
 
 const int ledPin = 13;
 const int DELAY_INTERVAL_MS = 1000;
+const int NUM_LEDS_TOTAL = NUM_LEDS_PER_STRIP * NUM_STRIPS;
 
 // Pin list: Strip 0 on pin 0, Strip 1 on pin 1
 const byte pinList[NUM_STRIPS] = {0, 1};
@@ -47,6 +48,14 @@ public:
 
 CTeensy4Controller<GRB> *pcontroller;
 
+// CRGBSet views for symmetric addressing from center
+// stripLeft[0] = center, stripLeft[299] = far left
+// stripRight[0] = center, stripRight[299] = far right (reversed in memory)
+CRGBSet stripLeft(leds, NUM_LEDS_PER_STRIP);
+CRGBSet stripRight(leds, NUM_LEDS_PER_STRIP * 2 - 1, NUM_LEDS_PER_STRIP - 1);  // reversed
+
+int pulsePos = 0;
+
 void setup()
 {
     pcontroller = new CTeensy4Controller<GRB>(&octo);
@@ -58,22 +67,27 @@ void setup()
 
 void loop()
 {
-    // Fill both strips with rainbow
-    for (int i = 0; i < NUM_LEDS_PER_STRIP; i++) {
-        uint8_t hue = (i * 255) / NUM_LEDS_PER_STRIP;
-        leds[i] = CHSV(hue, 255, 255);                          // Strip 0 (pin 0)
-        leds[i + NUM_LEDS_PER_STRIP] = CHSV(hue, 255, 255);     // Strip 1 (pin 1)
+    // Clear previous frame
+    FastLED.clear();
+
+    // Draw a pulse that travels outward from center on both strips symmetrically
+    const int pulseWidth = 20;
+    for (int i = 0; i < pulseWidth; i++) {
+        int pos = pulsePos + i;
+        if (pos < NUM_LEDS_PER_STRIP) {
+            uint8_t brightness = 255 - (i * 255 / pulseWidth);  // fade tail
+            stripLeft[pos] = CHSV(0, 255, brightness);   // red pulse going left
+            stripRight[pos] = CHSV(0, 255, brightness);  // red pulse going right (mirrored)
+        }
     }
 
     FastLED.show();
-    digitalWrite(ledPin, HIGH);
 
-    delay(DELAY_INTERVAL_MS);
+    const int speed_mult = 4;
+    pulsePos += speed_mult;
+    if (pulsePos >= NUM_LEDS_PER_STRIP) {
+        pulsePos = 0;
+    }
 
-    // Turn off
-    FastLED.clear();
-    FastLED.show();
-    digitalWrite(ledPin, LOW);
-
-    delay(DELAY_INTERVAL_MS);
+    delay(1);  // ~100 fps
 }
