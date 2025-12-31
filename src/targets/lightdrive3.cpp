@@ -51,29 +51,26 @@ public:
 
 CTeensy4Controller<GRB> *pcontroller;
 
-float pulseStrength = 0.0f;
+const int kMaxAnimations = 100;
+const int kMaxAnimationFrames = 32;
+const int kLastAnimationFrame = kMaxAnimationFrames - 1;
+int event_lookup[kMaxAnimations] = {};
 
-// Optional: keep track of last MIDI activity time if you later want timeouts
-unsigned long lastMidiOnTime = 0;
+int NULL_ANIMATION_IDX = 0;
+int KICK_EVENT_IDX = 1;
+int SNARE_EVENT_IDX = 2;
 
-static inline void handleMidi()
-{
-    // Drain all pending MIDI packets each loop iteration
-    while (usbMIDI.read()) {
-        const uint8_t type = usbMIDI.getType();
+int animation_tick[kMaxAnimations] = {};
+uint8_t animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {};
 
-        // “Any MIDI on event only” interpreted as Note On with velocity > 0
-        if (type == usbMIDI.NoteOn) {
-            const uint8_t velocity = usbMIDI.getData2();
-            if (velocity > 0) {
-                pulseStrength = 255.0f;
-                lastMidiOnTime = millis();
-            }
-        }
+uint32_t kick_event_lookup[kMaxAnimationFrames] = {};
+uint32_t snare_event_lookup[kMaxAnimationFrames] = {};
 
-        // Ignore NoteOff and everything else per request
-    }
-}
+const int LOWER_LEFT_START = 36;
+const int TOP_LEFT_START = 52;
+const int LOWER_RIGHT_START = 68;
+const int TOP_RIGHT_START = 84;
+const int PAD_COUNT = 16;
 
 void setup()
 {
@@ -82,6 +79,85 @@ void setup()
     FastLED.setBrightness(50);
 
     pinMode(ledPin, OUTPUT);
+
+    // Start all animation ticks at the last frame
+    for(int i = 0; i < kMaxAnimations; i++) {
+        animation_tick[i] = kLastAnimationFrame;
+    }
+
+    // Map the lookups
+    for(int i = 0; i < LOWER_LEFT_START; i++) {
+        event_lookup[i] = NULL_ANIMATION_IDX; // technically invalid
+    }
+    for(int i = LOWER_LEFT_START; i < LOWER_LEFT_START + PAD_COUNT; i++) {
+        event_lookup[i] = NULL_ANIMATION_IDX; // technically invalid
+    }
+    for(int i = LOWER_RIGHT_START; i < LOWER_RIGHT_START+ PAD_COUNT; i++) {
+        event_lookup[i] = NULL_ANIMATION_IDX; // technically invalid
+    }
+    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
+        event_lookup[i] = KICK_EVENT_IDX;
+    }
+    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
+        event_lookup[i] = KICK_EVENT_IDX;
+    }
+
+    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
+        event_lookup[i] = KICK_EVENT_IDX;
+    }
+    for(int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++){
+        event_lookup[i] = SNARE_EVENT_IDX;
+    }
+
+    // INITIALIZE THE ANIMATIONS
+    for(int i = 0; i < kMaxAnimationFrames; i++) {
+        animation_lookup[KICK_EVENT_IDX][i] = 255 - 4 * i;
+    }
+
+    for(int i = 0; i < kMaxAnimationFrames; i++) {
+        animation_lookup[SNARE_EVENT_IDX][i] = std::max(255 - 8 * i, 0);
+    }
+
+    // The last frame of every animation shall be zero
+    for(int i = 0; i < kMaxAnimations; i++) {
+        animation_lookup[i][kLastAnimationFrame] = 0;
+    }
+
+    Serial.begin(115200);
+
+    // Optional: wait a short time for the host to open the port
+    // (don’t block forever in show code; keep it short)
+    uint32_t t0 = millis();
+    while (!Serial && (millis() - t0) < 1500) {}
+
+    Serial.println("Boot: USB MIDI + Serial active");
+}
+
+struct MidiEvent {
+    uint8_t type;
+    uint8_t note;
+    uint8_t velocity;
+    uint32_t timestamp_ms;
+};
+
+MidiEvent lastMidiEvent;
+
+static inline void handleMidi()
+{
+    while (usbMIDI.read()) {
+        lastMidiEvent.type      = usbMIDI.getType();
+        lastMidiEvent.note      = usbMIDI.getData1();
+        lastMidiEvent.velocity  = usbMIDI.getData2();
+        lastMidiEvent.timestamp_ms = millis();
+
+        // get the note mapping:
+        if (lastMidiEvent.type != usbMIDI.NoteOn) {
+            continue; // ignore everything that isn't note on for now.
+        }
+
+        int ani_idx = event_lookup[lastMidiEvent.note];
+        animation_tick[ani_idx] = 0; // Start the animation;
+    }
 }
 
 void loop()
@@ -89,19 +165,26 @@ void loop()
     // Handle USB MIDI input (must be called frequently)
     handleMidi();
 
-    // Exponential decay
-    if (pulseStrength > 0.0f) {
-        pulseStrength *= 0.9f;  // decay factor
+    // for any non zero animation_tick, tick it forwards by 1
+    for(int i = 0; i < kMaxAnimations; i++) {
+        if(animation_tick[i] < kLastAnimationFrame) { // dont go over the last frame lol
+            animation_tick[i] += 1;
+        }
     }
-    if (pulseStrength < BRIGHTNESS_CUTOFF) {
-        pulseStrength = 0.0f;
+
+    // Go through all animations, and find the current sum brightness.
+    uint8_t brightness = 0;
+    for(int ani_idx = 0; ani_idx < kMaxAnimations; ani_idx++) {
+        int frame_idx = animation_tick[ani_idx];
+        uint8_t ani_brightness = animation_lookup[ani_idx][frame_idx];
+        brightness = qadd8(ani_brightness, brightness);
+        Serial.printf("ani_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, ani_brightness, brightness);
     }
 
     // Fill entire strip with solid color at current pulse strength
-    const uint8_t brightness = (uint8_t)pulseStrength;
-    const CRGB color = CHSV(0, 255, brightness);  // red at varying brightness
+    const CRGB color = CHSV(96,255, brightness);  // red at varying brightness
     fill_solid(leds, NUM_LEDS_TOTAL, color);
-
+    Serial.printf("Brightness %u\n", brightness);
     FastLED.show();
 
     delay(1);

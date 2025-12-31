@@ -71,3 +71,30 @@ Python -> MIDI -> (USB Host/MIDI/ALSA?) -> MIDI over USB -> Teensy -> LightDrive
 ```
 
 Nice.
+
+---
+
+Mappings
+
+Bottom Left
+- [36, 52)
+- Sustained looks (wash, glow, color fields)
+
+Top Left
+- [52, 68)
+- Beats / hits (kick flashes, strobes)
+
+Bottom Right
+- [68, 84)
+- Transitions (builds, drops, blackouts)
+
+Top Right
+- [84, 100)
+- Accents (snare, off-beat, syncopation)
+
+---
+
+Fast upload:
+```
+pio run -e lightdrive3 -t upload && sleep 1 && aconnect 32:1 24:0
+```
