@@ -183,13 +183,13 @@ void loop()
         int frame_idx = animation_tick[ani_idx];
         uint8_t ani_brightness = animation_lookup[ani_idx][frame_idx];
         brightness = qadd8(ani_brightness, brightness);
-        Serial.printf("ani_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, ani_brightness, brightness);
+        // Serial.printf("ani_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, ani_brightness, brightness);
     }
 
     // Fill entire strip with solid color at current pulse strength
     const CRGB color = CHSV(96,255, brightness);  // red at varying brightness
     fill_solid(leds, NUM_LEDS_TOTAL, color);
-    Serial.printf("Brightness %u\n", brightness);
+    // Serial.printf("Brightness %u\n", brightness);
     FastLED.show();
 
     delay(1);
