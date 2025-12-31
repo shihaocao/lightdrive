@@ -54,37 +54,21 @@ CTeensy4Controller<GRB> *pcontroller;
 const int kMaxAnimations = 100;
 const int kMaxAnimationFrames = 32;
 const int kLastAnimationFrame = kMaxAnimationFrames - 1;
-int note_to_ani_tbl[kMaxAnimations] = {};
-
+int note_to_ani_tbl[kMaxAnimations] = {}; // This maps from MIDI Note to the Animation Index
 int NULL_ANIMATION_IDX = 0;
 int KICK_EVENT_IDX = 1;
 int SNARE_EVENT_IDX = 2;
+int animation_tick[kMaxAnimations] = {}; // This maps from animation to the current frame index.
+uint8_t animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d array. Rows are animations, cols are the frames within each animation
 
-int animation_tick[kMaxAnimations] = {};
-uint8_t animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {};
-
-uint32_t kick_event_lookup[kMaxAnimationFrames] = {};
-uint32_t snare_event_lookup[kMaxAnimationFrames] = {};
-
+// Launchpad X Custom note numbers
 const int LOWER_LEFT_START = 36;
 const int TOP_LEFT_START = 52;
 const int LOWER_RIGHT_START = 68;
 const int TOP_RIGHT_START = 84;
-const int PAD_COUNT = 16;
+const int PAD_COUNT = 16; // 4 x 4 grid.
 
-void setup()
-{
-    pcontroller = new CTeensy4Controller<GRB>(&octo);
-    FastLED.addLeds(pcontroller, leds, NUM_STRIPS * NUM_LEDS_PER_STRIP);
-    FastLED.setBrightness(50);
-
-    pinMode(ledPin, OUTPUT);
-
-    // Start all animation ticks at the last frame
-    for(int i = 0; i < kMaxAnimations; i++) {
-        animation_tick[i] = kLastAnimationFrame;
-    }
-
+void setupEventLookups() {
     // Map the lookups
     for(int i = 0; i < LOWER_LEFT_START; i++) {
         note_to_ani_tbl[i] = NULL_ANIMATION_IDX; // technically invalid
@@ -108,8 +92,16 @@ void setup()
     for(int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++){
         note_to_ani_tbl[i] = SNARE_EVENT_IDX;
     }
+}
 
+void setupAnimations() {
     // INITIALIZE THE ANIMATIONS
+
+    // Start all animation ticks at the last frame
+    for(int i = 0; i < kMaxAnimations; i++) {
+        animation_tick[i] = kLastAnimationFrame;
+    }
+
     for(int i = 0; i < kMaxAnimationFrames; i++) {
         animation_lookup[KICK_EVENT_IDX][i] = 255 - 4 * i;
     }
@@ -122,15 +114,28 @@ void setup()
     for(int i = 0; i < kMaxAnimations; i++) {
         animation_lookup[i][kLastAnimationFrame] = 0;
     }
+}
 
+void setupSerial() {
     Serial.begin(115200);
 
-    // Optional: wait a short time for the host to open the port
-    // (don’t block forever in show code; keep it short)
     uint32_t t0 = millis();
     while (!Serial && (millis() - t0) < 1500) {}
 
     Serial.println("Boot: USB MIDI + Serial active");
+}
+
+void setup()
+{
+    pcontroller = new CTeensy4Controller<GRB>(&octo);
+    FastLED.addLeds(pcontroller, leds, NUM_STRIPS * NUM_LEDS_PER_STRIP);
+    FastLED.setBrightness(50);
+
+    pinMode(ledPin, OUTPUT);
+
+    setupEventLookups();
+    setupAnimations();
+    setupSerial();
 }
 
 struct MidiEvent {
