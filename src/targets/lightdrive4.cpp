@@ -52,7 +52,7 @@ public:
 CTeensy4Controller<GRB> *pcontroller;
 
 const int kMaxAnimations = 100;
-const int kMaxAnimationFrames = 32;
+const int kMaxAnimationFrames = 128;
 const int kLastAnimationFrame = kMaxAnimationFrames - 1;
 int note_to_ani_tbl[kMaxAnimations] = {}; // This maps from MIDI Note to the Animation Index
 int NULL_ANIMATION_IDX = 0;
@@ -82,13 +82,6 @@ void setupEventLookups() {
     for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
         note_to_ani_tbl[i] = KICK_EVENT_IDX;
     }
-    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
-        note_to_ani_tbl[i] = KICK_EVENT_IDX;
-    }
-
-    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
-        note_to_ani_tbl[i] = KICK_EVENT_IDX;
-    }
     for(int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++){
         note_to_ani_tbl[i] = SNARE_EVENT_IDX;
     }
@@ -103,11 +96,11 @@ void setupAnimations() {
     }
 
     for(int i = 0; i < kMaxAnimationFrames; i++) {
-        animation_lookup[KICK_EVENT_IDX][i] = 255 - 4 * i;
+        animation_lookup[KICK_EVENT_IDX][i] = 255 - 2 * i;
     }
 
     for(int i = 0; i < kMaxAnimationFrames; i++) {
-        animation_lookup[SNARE_EVENT_IDX][i] = std::max(255 - 8 * i, 0);
+        animation_lookup[SNARE_EVENT_IDX][i] = i < 10 ? 255 : 0;
     }
 
     // The last frame of every animation shall be zero
@@ -162,6 +155,8 @@ static inline void handleMidi()
 
         int ani_idx = note_to_ani_tbl[lastMidiEvent.note];
         animation_tick[ani_idx] = 0; // Start the animation;
+
+        Serial.printf("ani_idx=%d\n", ani_idx);
     }
 }
 
