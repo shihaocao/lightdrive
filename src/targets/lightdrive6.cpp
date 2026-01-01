@@ -385,11 +385,23 @@ void loop()
     // Background
     fill_solid(leds, NUM_LEDS_TOTAL, base_color);
 
+    // Status LED
+    int status = 0;
+    if(base_color.r > 0 || base_color.g > 0 || base_color.b > 0) {
+        status += 1;
+    }
+
     for(int ani_idx = WAVE_EVENT_BASE; ani_idx < WAVE_EVENT_BASE + kMaxSubPadColorCount; ani_idx++) {
         if(animation_running[ani_idx]) {
+            status += 1;
             overlayMovingPulse(leds, ani_idx);
         }
     }
+
+    // Status LED
+    uint8_t pin_signal = status ? HIGH : LOW;
+    digitalWrite(ledPin, pin_signal);
+
     // Serial.printf("Brightness %u\n", brightness);
     FastLED.show();
 
