@@ -62,6 +62,7 @@ int note_to_ani_tbl[kMaxAnimations] = {}; // This maps from MIDI Note to the Ani
 int NULL_ANIMATION_IDX = 0;
 int KICK_EVENT_BASE = 1;
 int KICK_EVENT_IDX = 1;
+int SNARE_EVENT_BASE = 17;
 int SNARE_EVENT_IDX = 17;
 int BREATHING_MIN = 70;
 int BREATHING_IDX = 80;
@@ -73,6 +74,7 @@ CRGB animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d
 
 const int kMaxSubPadColorCount = 16;
 CHSV kick_colors[kMaxSubPadColorCount] = {};
+CHSV snare_colors[kMaxSubPadColorCount] = {};
 
 // Launchpad X Custom note numbers
 const int LOWER_LEFT_START = 36;
@@ -103,7 +105,8 @@ void setupEventLookups()
     }
     for (int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++)
     {
-        note_to_ani_tbl[i] = SNARE_EVENT_IDX;
+        int sub_idx = i - TOP_RIGHT_START;
+        note_to_ani_tbl[i] = SNARE_EVENT_BASE + sub_idx;
     }
 }
 
@@ -130,6 +133,18 @@ void setupAnimations()
         kick_colors[i] = CHSV(color_hue, 255, 255);
     }
 
+    for(int i = 0; i < kMaxSubPadColorCount; i++) {
+        uint8_t color_hue = 30*(i / 2);
+        snare_colors[i] = CHSV(color_hue, 255, 255);
+    }
+
+    // set the idx 0 1 [2, 3] to white, i don't like that yellow.
+    snare_colors[2] = CHSV(0, 0, 255);
+    snare_colors[3] = CHSV(0, 0, 255);
+    kick_colors[2] = CHSV(0, 0, 255);
+    kick_colors[3] = CHSV(0, 0, 255);
+
+    // kick animations
     for (int c = 0; c < kMaxSubPadColorCount; c++) {
         int kick_event_idx = c + KICK_EVENT_BASE;
         CHSV kick_color = kick_colors[c];
@@ -149,12 +164,31 @@ void setupAnimations()
         }
     }
 
-    for (int i = 0; i < kMaxAnimationFrames; i++)
-    {
-        const uint8_t strobe_frame_max = 3;
-        uint8_t white_intensity = i < strobe_frame_max ? 255 : 0;
-        animation_lookup[SNARE_EVENT_IDX][i] = CRGB(white_intensity, white_intensity, white_intensity);
+    // snare animations
+    for (int c = 0; c < kMaxSubPadColorCount; c++) {
+        int event_idx = c + SNARE_EVENT_BASE;
+        CHSV ani_color = snare_colors[c];
+
+        uint8_t val = 255;
+        for (int i = 0; i < kMaxAnimationFrames; i++)
+        {
+            const uint8_t strobe_frame_max = 3;
+            uint8_t white_intensity = i < strobe_frame_max ? 255 : 0;
+            ani_color.val = white_intensity;
+            animation_lookup[event_idx][i] = ani_color;
+
+            // ani_color.val = val;
+            // // animation_lookup[KICK_EVENT_IDX][i] = CRGB(0, val, 0);
+            // animation_lookup[event_idx][i] = ani_color;
+        }
     }
+
+    // for (int i = 0; i < kMaxAnimationFrames; i++)
+    // {
+    //     const uint8_t strobe_frame_max = 3;
+    //     uint8_t white_intensity = i < strobe_frame_max ? 255 : 0;
+    //     animation_lookup[SNARE_EVENT_IDX][i] = CRGB(white_intensity, white_intensity, white_intensity);
+    // }
 
     for (uint16_t i = 0; i < kMaxAnimationFrames; i++)
     {
