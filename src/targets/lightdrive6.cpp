@@ -17,6 +17,9 @@ const byte pinList[NUM_STRIPS] = {0, 1};
 
 // FastLED array
 CRGB leds[NUM_STRIPS * NUM_LEDS_PER_STRIP];
+CRGBSet stripLeft(leds, NUM_LEDS_PER_STRIP);
+CRGBSet stripRight(leds, NUM_LEDS_PER_STRIP * 2 - 1, NUM_LEDS_PER_STRIP - 1);  // reversed
+// CRGBSet stripRight(leds, NUM_LEDS_PER_STRIP, NUM_LEDS_PER_STRIP * 2);  // reversed
 
 // OctoWS2811 buffers (sized for actual strip count: numLeds * numStrips * 3 bytes / 4 + 1)
 const int bufferSize = NUM_LEDS_PER_STRIP * NUM_STRIPS * 3 / 4 + 1;
@@ -64,14 +67,17 @@ int KICK_EVENT_BASE = 1;
 int KICK_EVENT_IDX = 1;
 int SNARE_EVENT_BASE = 17;
 int SNARE_EVENT_IDX = 17;
-int BREATHING_MIN = 60;
+int BREATHING_MIN = 40;
 int BREATHING_EVENT_BASE = BREATHING_MIN;
 int BREATHING_IDX = 80;
 int BREATHING_MAX = 80;
 
+int WAVE_EVENT_BASE = 60;
+
 bool animation_running[kMaxAnimations] = {};                     // Used for tracking if the animation is running. Used for FX
 int animation_tick[kMaxAnimations] = {};                         // This maps from animation to the current frame index.
 CRGB animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d array. Rows are animations, cols are the frames within each animation
+int pulse_position[kMaxAnimations] = {};
 
 const int kMaxSubPadColorCount = 16;
 CHSV kick_colors[kMaxSubPadColorCount] = {};
@@ -93,7 +99,8 @@ void setupEventLookups()
     }
     for (int i = LOWER_LEFT_START; i < LOWER_LEFT_START + PAD_COUNT; i++)
     {
-        note_to_ani_tbl[i] = NULL_ANIMATION_IDX; // technically invalid
+        int sub_idx = i - LOWER_LEFT_START;
+        note_to_ani_tbl[i] = WAVE_EVENT_BASE + sub_idx;
     }
     for (int i = LOWER_RIGHT_START; i < LOWER_RIGHT_START + PAD_COUNT; i++)
     {
@@ -303,6 +310,39 @@ static inline void handleMidi()
     }
 }
 
+static inline void overlayMovingPulse(CRGB* leds, int ani_idx)
+{
+    const uint8_t speed_mult = 6;
+    const uint8_t pulseWidth = 40;
+
+    int& pulsePos = pulse_position[ani_idx]; // Make this per animation
+    pulsePos += speed_mult;
+    if (pulsePos >= NUM_LEDS_PER_STRIP) {
+        pulsePos = 0;
+    }
+
+    for (uint8_t i = 0; i < pulseWidth; i++)
+    {
+        int pos = pulsePos + i;
+        if (pos >= NUM_LEDS_PER_STRIP) break;
+
+        uint8_t v = 255 - (uint16_t(i) * 255 / pulseWidth);
+        CHSV color = kick_colors[ani_idx - WAVE_EVENT_BASE]; // THIS IS A HACK AND IS NOT PORTABLE
+        color.v = v;
+
+        // CRGB += CRGB is saturating inside FastLED
+        stripLeft[pos]         += color; // strip 0
+        stripRight[pos]        += color; // strip 1
+    }
+}
+
+static inline void satAddPixel(CRGB& dst, const CRGB& src)
+{
+    dst.r = qadd8(dst.r, src.r);
+    dst.g = qadd8(dst.g, src.g);
+    dst.b = qadd8(dst.b, src.b);
+}
+
 void loop()
 {
     // Handle USB MIDI input (must be called frequently)
@@ -326,25 +366,30 @@ void loop()
         }
     }
 
-    // Go through all animations, and find the current sum brightness.
+    // Mix animations -> base_color (saturating)
     CRGB base_color = CRGB(0, 0, 0);
     for (int ani_idx = 0; ani_idx < kMaxAnimations; ani_idx++)
     {
         int frame_idx = animation_tick[ani_idx];
+
+        // If you ever use sentinel values, clamp/skip here
+        if (frame_idx < 0) continue;
+        if (frame_idx > kLastAnimationFrame) frame_idx = kLastAnimationFrame;
+
         CRGB ani_value = animation_lookup[ani_idx][frame_idx];
-        base_color += ani_value; // should do saturating add.
 
-        uint8_t ani_val = qadd8(ani_value.r, ani_value.g);
-
-        // if(isEffect(ani_idx)) {
-        //     Serial.printf("ani_idx=%d, frame_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, frame_idx, ani_val);
-        // }
+        // saturating add (do NOT rely on operator+= doing what you want)
+        satAddPixel(base_color, ani_value);
     }
 
-    // Fill entire strip with solid color at current pulse strength
-    // const CRGB color = CHSV(96,255, brightness);  // red at varying brightness
-    const CRGB color = base_color;
-    fill_solid(leds, NUM_LEDS_TOTAL, color);
+    // Background
+    fill_solid(leds, NUM_LEDS_TOTAL, base_color);
+
+    for(int ani_idx = WAVE_EVENT_BASE; ani_idx < WAVE_EVENT_BASE + kMaxSubPadColorCount; ani_idx++) {
+        if(animation_running[ani_idx]) {
+            overlayMovingPulse(leds, ani_idx);
+        }
+    }
     // Serial.printf("Brightness %u\n", brightness);
     FastLED.show();
 

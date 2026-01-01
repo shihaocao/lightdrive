@@ -71,6 +71,12 @@ void loop()
     FastLED.clear();
 
     // Draw a pulse that travels outward from center on both strips symmetrically
+    const int speed_mult = 4;
+    pulsePos += speed_mult;
+    if (pulsePos >= NUM_LEDS_PER_STRIP) {
+        pulsePos = 0;
+    }
+
     const int pulseWidth = 20;
     for (int i = 0; i < pulseWidth; i++) {
         int pos = pulsePos + i;
@@ -82,12 +88,6 @@ void loop()
     }
 
     FastLED.show();
-
-    const int speed_mult = 4;
-    pulsePos += speed_mult;
-    if (pulsePos >= NUM_LEDS_PER_STRIP) {
-        pulsePos = 0;
-    }
 
     delay(1);  // ~100 fps
 }
