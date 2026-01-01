@@ -28,16 +28,20 @@ OctoWS2811 octo(NUM_LEDS_PER_STRIP, displayMemory, drawingMemory,
 
 // Custom controller to bridge FastLED to OctoWS2811
 template <EOrder RGB_ORDER = GRB>
-class CTeensy4Controller : public CPixelLEDController<RGB_ORDER, 8, 0xFF> {
+class CTeensy4Controller : public CPixelLEDController<RGB_ORDER, 8, 0xFF>
+{
     OctoWS2811 *pocto;
+
 public:
     CTeensy4Controller(OctoWS2811 *_pocto) : pocto(_pocto) {}
 
     virtual void init() override { pocto->begin(); }
 
-    virtual void showPixels(PixelController<RGB_ORDER, 8, 0xFF> &pixels) override {
+    virtual void showPixels(PixelController<RGB_ORDER, 8, 0xFF> &pixels) override
+    {
         uint32_t i = 0;
-        while (pixels.has(1)) {
+        while (pixels.has(1))
+        {
             uint8_t r = pixels.loadAndScale0();
             uint8_t g = pixels.loadAndScale1();
             uint8_t b = pixels.loadAndScale2();
@@ -52,14 +56,23 @@ public:
 CTeensy4Controller<GRB> *pcontroller;
 
 const int kMaxAnimations = 100;
-const int kMaxAnimationFrames = 128;
+const int kMaxAnimationFrames = 1000;
 const int kLastAnimationFrame = kMaxAnimationFrames - 1;
 int note_to_ani_tbl[kMaxAnimations] = {}; // This maps from MIDI Note to the Animation Index
 int NULL_ANIMATION_IDX = 0;
+int KICK_EVENT_BASE = 1;
 int KICK_EVENT_IDX = 1;
-int SNARE_EVENT_IDX = 2;
-int animation_tick[kMaxAnimations] = {}; // This maps from animation to the current frame index.
+int SNARE_EVENT_IDX = 17;
+int BREATHING_MIN = 70;
+int BREATHING_IDX = 80;
+int BREATHING_MAX = 80;
+
+bool animation_running[kMaxAnimations] = {};                     // Used for tracking if the animation is running. Used for FX
+int animation_tick[kMaxAnimations] = {};                         // This maps from animation to the current frame index.
 CRGB animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d array. Rows are animations, cols are the frames within each animation
+
+const int kMaxSubPadColorCount = 16;
+CHSV kick_colors[kMaxSubPadColorCount] = {};
 
 // Launchpad X Custom note numbers
 const int LOWER_LEFT_START = 36;
@@ -68,60 +81,127 @@ const int LOWER_RIGHT_START = 68;
 const int TOP_RIGHT_START = 84;
 const int PAD_COUNT = 16; // 4 x 4 grid.
 
-void setupEventLookups() {
+void setupEventLookups()
+{
     // Map the lookups
-    for(int i = 0; i < LOWER_LEFT_START; i++) {
+    for (int i = 0; i < LOWER_LEFT_START; i++)
+    {
         note_to_ani_tbl[i] = NULL_ANIMATION_IDX; // technically invalid
     }
-    for(int i = LOWER_LEFT_START; i < LOWER_LEFT_START + PAD_COUNT; i++) {
+    for (int i = LOWER_LEFT_START; i < LOWER_LEFT_START + PAD_COUNT; i++)
+    {
         note_to_ani_tbl[i] = NULL_ANIMATION_IDX; // technically invalid
     }
-    for(int i = LOWER_RIGHT_START; i < LOWER_RIGHT_START+ PAD_COUNT; i++) {
-        note_to_ani_tbl[i] = NULL_ANIMATION_IDX; // technically invalid
+    for (int i = LOWER_RIGHT_START; i < LOWER_RIGHT_START + PAD_COUNT; i++)
+    {
+        note_to_ani_tbl[i] = BREATHING_IDX;
     }
-    for(int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++) {
-        note_to_ani_tbl[i] = KICK_EVENT_IDX;
+    for (int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++)
+    {
+        int sub_idx = i - TOP_LEFT_START;
+        note_to_ani_tbl[i] = KICK_EVENT_BASE + sub_idx;
     }
-    for(int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++){
+    for (int i = TOP_RIGHT_START; i < TOP_RIGHT_START + PAD_COUNT; i++)
+    {
         note_to_ani_tbl[i] = SNARE_EVENT_IDX;
     }
 }
 
-void setupAnimations() {
+void setupAnimations()
+{
     // INITIALIZE THE ANIMATIONS
 
     // Start all animation ticks at the last frame
-    for(int i = 0; i < kMaxAnimations; i++) {
+    for (int i = 0; i < kMaxAnimations; i++)
+    {
         animation_tick[i] = kLastAnimationFrame;
     }
 
     // WARNING:
     // IT IS ACTUALLY G R B not RGB!!!
     // CRGB(0, val, 0) = red!
+    // CHSV 25 is green ish
+    // 250 is also green ish
+    // 150 is purple ish
+    // 80 is yellow ish
 
-    uint8_t val = 255;
-    for(int i = 0; i < kMaxAnimationFrames; i++) {
-        val = (uint8_t)(val * 0.95f);
-        animation_lookup[KICK_EVENT_IDX][i] = CRGB(0, val, 0);
+    for(int i = 0; i < kMaxSubPadColorCount; i++) {
+        uint8_t color_hue = 30*(i / 2);
+        kick_colors[i] = CHSV(color_hue, 255, 255);
     }
 
-    for(int i = 0; i < kMaxAnimationFrames; i++) {
+    for (int c = 0; c < kMaxSubPadColorCount; c++) {
+        int kick_event_idx = c + KICK_EVENT_BASE;
+        CHSV kick_color = kick_colors[c];
+
+        uint8_t val = 255;
+        for (int i = 0; i < kMaxAnimationFrames; i++)
+        {
+            val = (uint8_t)(val * 0.92f);
+            if (val < 10)
+            {
+                val = 0;
+            }
+
+            kick_color.val = val;
+            // animation_lookup[KICK_EVENT_IDX][i] = CRGB(0, val, 0);
+            animation_lookup[kick_event_idx][i] = kick_color;
+        }
+    }
+
+    for (int i = 0; i < kMaxAnimationFrames; i++)
+    {
         const uint8_t strobe_frame_max = 3;
         uint8_t white_intensity = i < strobe_frame_max ? 255 : 0;
         animation_lookup[SNARE_EVENT_IDX][i] = CRGB(white_intensity, white_intensity, white_intensity);
     }
 
+    for (uint16_t i = 0; i < kMaxAnimationFrames; i++)
+    {
+        const uint16_t breathing_period = 100; // frames per cycle
+        const uint8_t  breathing_min    = 40;
+        const uint8_t  breathing_max    = 245;
+
+        // Phase within cycle
+        uint16_t phase = i % breathing_period;
+
+        uint8_t intensity;
+
+        // First half: ramp up
+        if (phase < breathing_period / 2) {
+            intensity = map(
+                phase,
+                0, breathing_period / 2,
+                breathing_min, breathing_max
+            );
+        }
+        // Second half: ramp down
+        else {
+            intensity = map(
+                phase,
+                breathing_period / 2, breathing_period,
+                breathing_max, breathing_min
+            );
+        }
+
+        animation_lookup[BREATHING_IDX][i] = CHSV(150, 255, intensity);
+    }
+
     // The last frame of every animation shall be zero
-    for(int i = 0; i < kMaxAnimations; i++) {
-        animation_lookup[i][kLastAnimationFrame] = CRGB(0,0,0);
+    for (int i = 0; i < kMaxAnimations; i++)
+    {
+        animation_lookup[i][kLastAnimationFrame] = CRGB(0, 0, 0);
     }
 }
 
-void setupSerial() {
+void setupSerial()
+{
     Serial.begin(115200);
 
     uint32_t t0 = millis();
-    while (!Serial && (millis() - t0) < 1500) {}
+    while (!Serial && (millis() - t0) < 1500)
+    {
+    }
 
     Serial.println("Boot: USB MIDI + Serial active");
 }
@@ -139,7 +219,8 @@ void setup()
     setupSerial();
 }
 
-struct MidiEvent {
+struct MidiEvent
+{
     uint8_t type;
     uint8_t note;
     uint8_t velocity;
@@ -148,23 +229,46 @@ struct MidiEvent {
 
 MidiEvent lastMidiEvent;
 
+bool isEffect(int idx) {
+    return (idx >= BREATHING_MIN) && (idx <= BREATHING_MAX);
+    // return idx == BREATHING_IDX;
+    // pad idx based, WRONG
+    // return (idx >= LOWER_RIGHT_START) && (idx < (LOWER_RIGHT_START + PAD_COUNT));
+}
+
 static inline void handleMidi()
 {
-    while (usbMIDI.read()) {
-        lastMidiEvent.type      = usbMIDI.getType();
-        lastMidiEvent.note      = usbMIDI.getData1();
-        lastMidiEvent.velocity  = usbMIDI.getData2();
+    while (usbMIDI.read())
+    {
+        lastMidiEvent.type = usbMIDI.getType();
+        lastMidiEvent.note = usbMIDI.getData1();
+        lastMidiEvent.velocity = usbMIDI.getData2();
         lastMidiEvent.timestamp_ms = millis();
 
         // get the note mapping:
-        if (lastMidiEvent.type != usbMIDI.NoteOn) {
+        if (lastMidiEvent.type == usbMIDI.NoteOn)
+        {
+            int ani_idx = note_to_ani_tbl[lastMidiEvent.note];
+            animation_running[ani_idx] = true; // Shouldn't matter as long as effect is < 100 ms.
+            animation_tick[ani_idx] = 0;
+            Serial.printf("Note on ani_idx=%d\n", ani_idx);
             continue; // ignore everything that isn't note on for now.
         }
 
-        int ani_idx = note_to_ani_tbl[lastMidiEvent.note];
-        animation_tick[ani_idx] = 0; // Start the animation;
+        if (lastMidiEvent.type == usbMIDI.NoteOff) 
+        {
+            int ani_idx = note_to_ani_tbl[lastMidiEvent.note];
+            animation_running[ani_idx] = false; // Shouldn't matter as long as effect is < 100 ms.
 
-        Serial.printf("ani_idx=%d\n", ani_idx);
+            // End the effect immidiaetely if it's in the FX region.
+            if (isEffect(ani_idx))
+            {
+                animation_running[ani_idx] = false;
+                animation_tick[ani_idx] = kLastAnimationFrame;
+            }
+            Serial.printf("Note off ani_idx=%d\n", ani_idx);
+            continue;
+        }
     }
 }
 
@@ -174,19 +278,36 @@ void loop()
     handleMidi();
 
     // for any non zero animation_tick, tick it forwards by 1
-    for(int i = 0; i < kMaxAnimations; i++) {
-        if(animation_tick[i] < kLastAnimationFrame) { // dont go over the last frame lol
+    for (int i = 0; i < kMaxAnimations; i++)
+    {
+        if (animation_tick[i] < kLastAnimationFrame)
+        { // dont go over the last frame lol
             animation_tick[i] += 1;
         }
     }
 
+    // for all running animations, if it is running, and at the end, go back.
+    for (int i = 0; i < kMaxAnimations; i++)
+    {
+        if (!animation_running && isEffect(i))
+        {
+            animation_tick[i] = kMaxAnimationFrames; // Go to end
+        }
+    }
+
     // Go through all animations, and find the current sum brightness.
-    CRGB base_color = CRGB(0,0,0);
-    for(int ani_idx = 0; ani_idx < kMaxAnimations; ani_idx++) {
+    CRGB base_color = CRGB(0, 0, 0);
+    for (int ani_idx = 0; ani_idx < kMaxAnimations; ani_idx++)
+    {
         int frame_idx = animation_tick[ani_idx];
         CRGB ani_value = animation_lookup[ani_idx][frame_idx];
         base_color += ani_value; // should do saturating add.
-        // Serial.printf("ani_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, ani_brightness, brightness);
+
+        uint8_t ani_val = qadd8(ani_value.r, ani_value.g);
+
+        // if(isEffect(ani_idx)) {
+        //     Serial.printf("ani_idx=%d, frame_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, frame_idx, ani_val);
+        // }
     }
 
     // Fill entire strip with solid color at current pulse strength
