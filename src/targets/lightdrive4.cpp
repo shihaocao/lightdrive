@@ -64,7 +64,8 @@ int KICK_EVENT_BASE = 1;
 int KICK_EVENT_IDX = 1;
 int SNARE_EVENT_BASE = 17;
 int SNARE_EVENT_IDX = 17;
-int BREATHING_MIN = 70;
+int BREATHING_MIN = 60;
+int BREATHING_EVENT_BASE = BREATHING_MIN;
 int BREATHING_IDX = 80;
 int BREATHING_MAX = 80;
 
@@ -96,7 +97,8 @@ void setupEventLookups()
     }
     for (int i = LOWER_RIGHT_START; i < LOWER_RIGHT_START + PAD_COUNT; i++)
     {
-        note_to_ani_tbl[i] = BREATHING_IDX;
+        int sub_idx = i - LOWER_RIGHT_START;
+        note_to_ani_tbl[i] = BREATHING_EVENT_BASE + sub_idx;
     }
     for (int i = TOP_LEFT_START; i < TOP_LEFT_START + PAD_COUNT; i++)
     {
@@ -190,35 +192,41 @@ void setupAnimations()
     //     animation_lookup[SNARE_EVENT_IDX][i] = CRGB(white_intensity, white_intensity, white_intensity);
     // }
 
-    for (uint16_t i = 0; i < kMaxAnimationFrames; i++)
-    {
-        const uint16_t breathing_period = 100; // frames per cycle
-        const uint8_t  breathing_min    = 40;
-        const uint8_t  breathing_max    = 245;
+    for (int c = 0; c < kMaxSubPadColorCount; c++) {
+        CHSV ani_color = kick_colors[c]; // re use the kick colors lol
+        int event_idx = c + BREATHING_EVENT_BASE;
 
-        // Phase within cycle
-        uint16_t phase = i % breathing_period;
+        for (uint16_t i = 0; i < kMaxAnimationFrames; i++)
+        {
+            const uint16_t breathing_period = 100; // frames per cycle
+            const uint8_t  breathing_min    = 40;
+            const uint8_t  breathing_max    = 245;
 
-        uint8_t intensity;
+            // Phase within cycle
+            uint16_t phase = i % breathing_period;
 
-        // First half: ramp up
-        if (phase < breathing_period / 2) {
-            intensity = map(
-                phase,
-                0, breathing_period / 2,
-                breathing_min, breathing_max
-            );
+            uint8_t intensity;
+
+            // First half: ramp up
+            if (phase < breathing_period / 2) {
+                intensity = map(
+                    phase,
+                    0, breathing_period / 2,
+                    breathing_min, breathing_max
+                );
+            }
+            // Second half: ramp down
+            else {
+                intensity = map(
+                    phase,
+                    breathing_period / 2, breathing_period,
+                    breathing_max, breathing_min
+                );
+            }
+
+            ani_color.val = intensity;
+            animation_lookup[event_idx][i] = ani_color;
         }
-        // Second half: ramp down
-        else {
-            intensity = map(
-                phase,
-                breathing_period / 2, breathing_period,
-                breathing_max, breathing_min
-            );
-        }
-
-        animation_lookup[BREATHING_IDX][i] = CHSV(150, 255, intensity);
     }
 
     // The last frame of every animation shall be zero
