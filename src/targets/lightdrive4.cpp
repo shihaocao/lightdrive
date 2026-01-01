@@ -59,7 +59,7 @@ int NULL_ANIMATION_IDX = 0;
 int KICK_EVENT_IDX = 1;
 int SNARE_EVENT_IDX = 2;
 int animation_tick[kMaxAnimations] = {}; // This maps from animation to the current frame index.
-uint8_t animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d array. Rows are animations, cols are the frames within each animation
+CRGB animation_lookup[kMaxAnimations][kMaxAnimationFrames] = {}; // this is a 2d array. Rows are animations, cols are the frames within each animation
 
 // Launchpad X Custom note numbers
 const int LOWER_LEFT_START = 36;
@@ -95,17 +95,25 @@ void setupAnimations() {
         animation_tick[i] = kLastAnimationFrame;
     }
 
+    // WARNING:
+    // IT IS ACTUALLY G R B not RGB!!!
+    // CRGB(0, val, 0) = red!
+
+    uint8_t val = 255;
     for(int i = 0; i < kMaxAnimationFrames; i++) {
-        animation_lookup[KICK_EVENT_IDX][i] = 255 - 2 * i;
+        val = (uint8_t)(val * 0.95f);
+        animation_lookup[KICK_EVENT_IDX][i] = CRGB(0, val, 0);
     }
 
     for(int i = 0; i < kMaxAnimationFrames; i++) {
-        animation_lookup[SNARE_EVENT_IDX][i] = i < 10 ? 255 : 0;
+        const uint8_t strobe_frame_max = 3;
+        uint8_t white_intensity = i < strobe_frame_max ? 255 : 0;
+        animation_lookup[SNARE_EVENT_IDX][i] = CRGB(white_intensity, white_intensity, white_intensity);
     }
 
     // The last frame of every animation shall be zero
     for(int i = 0; i < kMaxAnimations; i++) {
-        animation_lookup[i][kLastAnimationFrame] = 0;
+        animation_lookup[i][kLastAnimationFrame] = CRGB(0,0,0);
     }
 }
 
@@ -173,16 +181,17 @@ void loop()
     }
 
     // Go through all animations, and find the current sum brightness.
-    uint8_t brightness = 0;
+    CRGB base_color = CRGB(0,0,0);
     for(int ani_idx = 0; ani_idx < kMaxAnimations; ani_idx++) {
         int frame_idx = animation_tick[ani_idx];
-        uint8_t ani_brightness = animation_lookup[ani_idx][frame_idx];
-        brightness = qadd8(ani_brightness, brightness);
+        CRGB ani_value = animation_lookup[ani_idx][frame_idx];
+        base_color += ani_value; // should do saturating add.
         // Serial.printf("ani_idx=%d, Ani brightness=%u, sum_Brightness %u\n", ani_idx, ani_brightness, brightness);
     }
 
     // Fill entire strip with solid color at current pulse strength
-    const CRGB color = CHSV(96,255, brightness);  // red at varying brightness
+    // const CRGB color = CHSV(96,255, brightness);  // red at varying brightness
+    const CRGB color = base_color;
     fill_solid(leds, NUM_LEDS_TOTAL, color);
     // Serial.printf("Brightness %u\n", brightness);
     FastLED.show();
