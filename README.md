@@ -1,7 +1,7 @@
 # lightdrive
 Launchpad MIDI controlled light show performance on a Teensy.
 <!-- ![Wide](documentation/01-lightdrive-wide.jpg) -->
-![Feature](documentation/02-lightdrive-feature.jpg)
+![HighlightClip](documentation/10-lightdrive-short-highlight2.gif)
 
 # How does it work?
 
@@ -54,6 +54,10 @@ The below diagrams help explain:
 - Fun fact, I used a 5m USB cable, and spliced off the end of it to have a better packaged way to run ground and two signal wires up to the LED strips and I would recommend that others do the same instead of trying to have multiple hookup wire runs up to the ceiling.
 - The AC power cable is strain relieved, the other ones are not... oops I was in a rush.
 - This all could be cleaner... but it works!
+
+## More Photos
+
+![Feature](documentation/02-lightdrive-feature1.jpg)
 
 ## AI Usage:
 I have done a similar project in the past, and tried to use AI for this and it fumbled miserably, it struggles to maintain correctness with indicies / multiple lookups. I knew going into this project that it would take much longer to write out all the lookup strategies that I would want it to use, and so instead I wrote all the lookup, animation progression, and summation code. It didn't take _that_ long.
