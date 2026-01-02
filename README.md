@@ -2,6 +2,7 @@
 Launchpad MIDI controlled light show performance on a Teensy.
 <!-- ![Wide](documentation/01-lightdrive-wide.jpg) -->
 ![HighlightClip](documentation/10-lightdrive-short-highlight2.gif)
+- Chris is DJing and I'm controlling the lights here
 
 # How does it work?
 
