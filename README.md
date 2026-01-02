@@ -49,6 +49,12 @@ The below diagrams help explain:
 - The `FINAL COLOR` is a `saturating` summation of all the colors.
 - **This summation strategy allows any combination of keys to be pressed at the same time**, the most satisfying combination to hit is a multiple snares being hit right after a kick, shown in the diagram.
 
+## Wiring
+![Wiring](documentation/09-wiring.jpg)
+- Fun fact, I used a 5m USB cable, and spliced off the end of it to have a better packaged way to run ground and two signal wires up to the LED strips and I would recommend that others do the same instead of trying to have multiple hookup wire runs up to the ceiling.
+- The AC power cable is strain relieved, the other ones are not... oops I was in a rush.
+- This all could be cleaner... but it works!
+
 ## AI Usage:
 I have done a similar project in the past, and tried to use AI for this and it fumbled miserably, it struggles to maintain correctness with indicies / multiple lookups. I knew going into this project that it would take much longer to write out all the lookup strategies that I would want it to use, and so instead I wrote all the lookup, animation progression, and summation code. It didn't take _that_ long.
 
