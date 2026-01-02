@@ -9,6 +9,12 @@ Launchpad MIDI controlled light show performance on a Teensy.
 ![Block Diagram](documentation/04-lightdrive-block-diagram.jpg)
 We use a Launchpad X to send MIDI to a Teensy 4.1 microcontroller over USB. Each note triggers an animation on the Teensy, which is connected to two 300-LED strips around the room. More LEDs can be added by chaining strips or by using more GPIOs.
 
+**BOM**
+- 1x [5V 40A PSU](https://www.amazon.com/dp/B07KCVBZ18?ref_=ppx_hzsearch_conn_dt_b_fed_asin_title_5&th=1)
+- 2x [5m 300 LED Strip WS2812](https://www.amazon.com/dp/B01CDTEJBG?ref_=ppx_hzsearch_conn_dt_b_fed_asin_title_2&th=1)
+- 1x [Novation Launchpad X](amazon.com/dp/B07WWZCMP5?ref=ppx_yo2ov_dt_b_fed_asin_title)
+- 1x [Teensy](https://a.co/d/2mNYX8x)
+
 ## Lighting Mapping
 
 ![Pad Division](documentation/05-pad-division.jpg)
