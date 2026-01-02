@@ -4,6 +4,14 @@ Launchpad MIDI controlled light show performance on a Teensy.
 ![HighlightClip](documentation/10-lightdrive-short-highlight2.gif)
 - Chris is DJing and I'm controlling the lights here
 
+---
+
+The final program to reference is this file:
+`src/targets/lightdrive6.cpp`
+
+Upload it via something like:
+`pio run -e lightdrive6 -t upload && sleep 1 && aconnect 32:1 28:0`
+
 # How does it work?
 
 ## System Design
